@@ -1,5 +1,7 @@
 # AI Workstation
 
+[![中文](https://img.shields.io/badge/中文-README_CN-blue)](./README_CN.md)
+
 Apple Silicon (M4) local AI runtime powered by [MLX](https://github.com/ml-explore/mlx).
 
 ## Hardware
