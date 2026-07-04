@@ -18,7 +18,7 @@ fi
 
 # 解析路径
 MODEL_PATH=$(grep -E "^[[:space:]]*${MODEL_NAME}[[:space:]]*=" "$CONF" 2>/dev/null | \
-    head -1 | sed 's/^[^=]*=[[:space:]]*//' | xargs)
+    head -1 | sed 's/^[^=]*=[[:space:]]*//' | sed "s|\$HOME|$HOME|g" | xargs)
 
 if [ -z "$MODEL_PATH" ] || [ ! -d "$MODEL_PATH" ]; then
     echo "$(date): Model not found: $MODEL_NAME (path: $MODEL_PATH)" >> "$LOG"
