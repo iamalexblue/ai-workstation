@@ -1,7 +1,7 @@
 // ============================================================
 // Kiss Translator — MLX Local Model Hooks
 // API URL: http://10.10.10.10:8080/v1/chat/completions
-// Model:   /Users/alexblue/AI/models/Qwen3-8B-4bit
+// Model:   __HOME__/AI/models/Qwen3-8B-4bit
 // API Key: local
 // ============================================================
 
@@ -12,7 +12,7 @@
 //   const userContent = args.userPrompt || JSON.stringify(args.texts?.map((t, i) => `[${i}] ${t}`).join('\n'));
 //
 //   const body = {
-//     model: "/Users/alexblue/AI/models/Qwen3-8B-4bit",
+//     model: "__HOME__/AI/models/Qwen3-8B-4bit",
 //     messages: [
 //       { role: "system", content: args.systemPrompt || args.nobatchPrompt || `You are a professional translator. Translate from ${args.from} to ${args.to}. Output ONLY the translation.` },
 //       { role: "user", content: userContent }
@@ -50,7 +50,7 @@ async (args) => {
   }
 
   var body = {
-    model: "/Users/alexblue/AI/models/Qwen3-8B-4bit",
+    model: "__HOME__/AI/models/Qwen3-8B-4bit",
     messages: [
       { role: "system", content: systemPrompt },
       { role: "user", content: userContent }

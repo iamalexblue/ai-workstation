@@ -16,8 +16,8 @@ _resolve() {
     local name="$1"
     local path
 
-    # 1) Exact match from models.conf
-    path=$(grep -E "^\s*${name}\s*=" "$CONF" 2>/dev/null | head -1 | sed 's/^[^=]*=\s*//' | xargs)
+    # 1) Exact match from models.conf (expand $HOME)
+    path=$(grep -E "^\s*${name}\s*=" "$CONF" 2>/dev/null | head -1 | sed 's/^[^=]*=\s*//' | sed "s|\$HOME|$HOME|g" | xargs)
     if [ -n "$path" ] && [ -d "$path" ]; then echo "$path"; return 0; fi
 
     # 2) Fuzzy match on key name

@@ -1,4 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Deploy: replace __HOME__ with your actual home directory path, e.g. /Users/yourname
+  macOS: sed -i '' "s|__HOME__|$HOME|g" com.local.mlx-server.plist
+-->
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
@@ -7,7 +11,7 @@
 
     <key>ProgramArguments</key>
     <array>
-        <string>/Users/alexblue/.local/bin/mlx-server-wrapper</string>
+        <string>__HOME__/.local/bin/mlx-server-wrapper</string>
     </array>
 
     <key>RunAtLoad</key>
@@ -17,7 +21,7 @@
     <true/>
 
     <key>WorkingDirectory</key>
-    <string>/Users/alexblue/AI/workspace</string>
+    <string>__HOME__/AI/workspace</string>
 
     <key>StandardOutPath</key>
     <string>/tmp/mlx-server.log</string>

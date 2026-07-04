@@ -63,7 +63,7 @@ OpenAI-compatible endpoint at `http://10.10.10.10:8080`:
 ```bash
 curl http://10.10.10.10:8080/v1/chat/completions \
   -H "Content-Type: application/json" \
-  -d '{"model":"/Users/alexblue/AI/models/Qwen3-8B-4bit","messages":[{"role":"user","content":"Hello"}],"max_tokens":100,"chat_template_kwargs":{"enable_thinking":false}}'
+  -d '{"model":"$HOME/AI/models/Qwen3-8B-4bit","messages":[{"role":"user","content":"Hello"}],"max_tokens":100,"chat_template_kwargs":{"enable_thinking":false}}'
 ```
 
 ## Proxy
@@ -96,4 +96,4 @@ See `config/kiss-translator-hooks.js` for the ES5-compatible hooks.
 |---------|-------|
 | API URL | `http://10.10.10.10:8080/v1/chat/completions` |
 | API Key | `local` |
-| Model | `/Users/alexblue/AI/models/Qwen3-8B-4bit` |
+| Model | `$HOME/AI/models/Qwen3-8B-4bit` |
