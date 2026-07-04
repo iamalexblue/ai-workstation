@@ -1,4 +1,4 @@
-# Python-generated files
+# Python
 __pycache__/
 *.py[oc]
 build/
@@ -6,17 +6,22 @@ dist/
 wheels/
 *.egg-info
 
-# Virtual environments
-.venv
-
-# AI Workspace config
-
+# Virtualenv
 .venv/
-__pycache__/
-*.pyc
 
+# Models & Cache (too large, re-downloadable)
+../models/
+../cache/
+
+# Secrets
 .env
 
-.cache
-
+# macOS
 .DS_Store
+.AppleDouble
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo

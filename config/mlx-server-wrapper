@@ -1,0 +1,37 @@
+#!/usr/bin/env bash
+# mlx-server-wrapper — launchd 调用此脚本启动模型服务
+# 从 ~/.config/mlx/current 读取当前活跃模型，解析路径后启动
+
+set -euo pipefail
+
+CONF="$HOME/.config/mlx/models.conf"
+CURRENT="$HOME/.config/mlx/current"
+PORT="${MLX_PORT:-8080}"
+LOG="/tmp/mlx-server.log"
+
+# 读取当前模型名称
+MODEL_NAME=$(cat "$CURRENT" 2>/dev/null || true)
+if [ -z "$MODEL_NAME" ]; then
+    echo "$(date): No active model configured. Run: mlx serve <name>" >> "$LOG"
+    exit 1
+fi
+
+# 解析路径
+MODEL_PATH=$(grep -E "^[[:space:]]*${MODEL_NAME}[[:space:]]*=" "$CONF" 2>/dev/null | \
+    head -1 | sed 's/^[^=]*=[[:space:]]*//' | xargs)
+
+if [ -z "$MODEL_PATH" ] || [ ! -d "$MODEL_PATH" ]; then
+    echo "$(date): Model not found: $MODEL_NAME (path: $MODEL_PATH)" >> "$LOG"
+    exit 1
+fi
+
+export HF_ENDPOINT="https://hf-mirror.com"
+export HF_HOME="$HOME/AI/cache/huggingface"
+export HF_HUB_CACHE="$HOME/AI/cache/huggingface/hub"
+export HUGGINGFACE_HUB_CACHE="$HOME/AI/cache/huggingface/hub"
+export PYTHONUNBUFFERED=1
+
+exec "$HOME/AI/workspace/.venv/bin/mlx_lm.server" \
+    --model "$MODEL_PATH" \
+    --host 0.0.0.0 \
+    --port "$PORT"

@@ -1,0 +1,286 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# ─── Config ────────────────────────────────────────────────────────
+CONF="$HOME/.config/mlx/models.conf"
+CURRENT="$HOME/.config/mlx/current"
+PLIST="$HOME/Library/LaunchAgents/com.local.mlx-server.plist"
+LOG_FILE="/tmp/mlx-server.log"
+PORT="${MLX_PORT:-8080}"
+API="http://localhost:$PORT"
+
+# ─── Helpers ───────────────────────────────────────────────────────
+
+_resolve() {
+    # Resolve model name → path. Tries: exact conf match → fuzzy key → fuzzy dir.
+    local name="$1"
+    local path
+
+    # 1) Exact match from models.conf
+    path=$(grep -E "^\s*${name}\s*=" "$CONF" 2>/dev/null | head -1 | sed 's/^[^=]*=\s*//' | xargs)
+    if [ -n "$path" ] && [ -d "$path" ]; then echo "$path"; return 0; fi
+
+    # 2) Fuzzy match on key name
+    path=$(awk -F= -v n="$name" 'tolower($1) ~ tolower(n) {gsub(/^[[:space:]]+|[[:space:]]+$/,"",$2); print $2; exit}' "$CONF")
+    if [ -n "$path" ] && [ -d "$path" ]; then echo "$path"; return 0; fi
+
+    # 3) Direct or ~/AI/models/<name> match
+    for d in "$HOME/AI/models/$name" "$name"; do
+        if [ -d "$d" ]; then echo "$d"; return 0; fi
+    done
+
+    echo ""
+    return 1
+}
+
+_running() {
+    curl -s "$API/v1/models" > /dev/null 2>&1
+}
+
+_fullpath() {
+    local p="$1"
+    cd "$p" 2>/dev/null && pwd || echo "$p"
+}
+
+_launchd_loaded() {
+    launchctl list com.local.mlx-server &>/dev/null
+}
+
+# ─── Commands ──────────────────────────────────────────────────────
+
+cmd_models() {
+    echo "Registered models:"
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    local active=""
+    active=$(cat "$CURRENT" 2>/dev/null || true)
+    while IFS='=' read -r name path; do
+        [[ "$name" =~ ^[[:space:]]*# ]] && continue
+        [ -z "$name" ] && continue
+        name=$(echo "$name" | xargs)
+        path=$(echo "$path" | xargs)
+        local marker=" "
+        [ "$name" = "$active" ] && marker="*"
+        if [ -d "$path" ]; then
+            printf " \033[32m%s\033[0m %-14s %s\n" "$marker" "$name" "$path"
+        else
+            printf " \033[31m%s\033[0m %-14s %s  (missing)\n" "$marker" "$name" "$path"
+        fi
+    done < "$CONF"
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo "  * = active   mlx register <name> <path>"
+}
+
+cmd_register() {
+    local name="$1" path="$2"
+    if [ -z "$name" ] || [ -z "$path" ]; then
+        echo "Usage: mlx register <name> <path>"
+        return 1
+    fi
+    path=$(_fullpath "$path")
+    if [ ! -d "$path" ]; then
+        echo "Error: directory not found: $path"
+        return 1
+    fi
+    sed -i '' "/^[[:space:]]*${name}[[:space:]]*=/d" "$CONF"
+    echo "$name = $path" >> "$CONF"
+    printf "\033[32m[✔] Registered: %s → %s\033[0m\n" "$name" "$path"
+}
+
+cmd_serve() {
+    local name="${1:-}"
+    if [ -z "$name" ]; then
+        echo "Usage: mlx serve <model>"
+        echo
+        cmd_models
+        return 1
+    fi
+
+    # Resolve model path
+    local model_path; model_path=$(_resolve "$name")
+    if [ -z "$model_path" ]; then
+        printf "\033[31mModel not found: %s\033[0m\n" "$name"
+        cmd_models
+        return 1
+    fi
+
+    # If running, stop first
+    if _running; then
+        printf "\033[33mServer already running — restarting with %s...\033[0m\n" "$name"
+        launchctl unload "$PLIST" 2>/dev/null || true
+        sleep 2
+    elif _launchd_loaded; then
+        launchctl unload "$PLIST" 2>/dev/null || true
+        sleep 1
+    fi
+
+    # Write current model and load via launchd
+    echo "$name" > "$CURRENT"
+    printf "\033[34m[✔] Activating: %s\033[0m\n" "$model_path"
+    launchctl load "$PLIST" 2>/dev/null
+
+    # Wait for server
+    printf "Waiting for server"
+    for i in $(seq 1 30); do
+        if _running; then
+            printf "\n\033[32m[✔] Server ready — %s\033[0m\n" "$API"
+            curl -s "$API/v1/models" | python3 -c "
+import json,sys
+data = json.load(sys.stdin)
+for m in data.get('data',[]):
+    print('  Model: ' + m['id'])
+"
+            # ─── Warmup ───
+            printf "Warming up..."
+            curl -s --max-time 90 "$API/v1/chat/completions" \
+                -H "Content-Type: application/json" \
+                -d "{\"model\":\"$model_path\",\"messages\":[{\"role\":\"user\",\"content\":\"hi\"}],\"max_tokens\":1,\"chat_template_kwargs\":{\"enable_thinking\":false}}" \
+                > /dev/null 2>&1 \
+                && printf " \033[32mready\033[0m\n" \
+                || printf " \033[33mtimed out (first request will be slower)\033[0m\n"
+            return 0
+        fi
+        printf "."
+        sleep 2
+    done
+
+    printf "\n\033[31m[✘] Server not responding. Check: mlx log\033[0m\n"
+    return 1
+}
+
+cmd_stop() {
+    if _launchd_loaded; then
+        launchctl unload "$PLIST" 2>/dev/null || true
+        printf "LaunchAgent: \033[31munloaded\033[0m\n"
+    fi
+
+    # Kill any lingering process
+    pkill -f mlx_lm.server 2>/dev/null || true
+    sleep 1
+
+    if _running; then
+        printf "\033[31m[✘] Failed to stop server (still responding)\033[0m\n"
+        return 1
+    fi
+    printf "\033[33mServer stopped.\033[0m\n"
+}
+
+cmd_status() {
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+    # LaunchAgent
+    printf "LaunchAgent:  "
+    if _launchd_loaded; then
+        printf "\033[32mloaded\033[0m  (auto-start on boot, auto-restart on crash)\n"
+    else
+        printf "\033[31mnot loaded\033[0m\n"
+    fi
+
+    # Active model
+    local active; active=$(cat "$CURRENT" 2>/dev/null || echo "none")
+    printf "Active model: \033[36m%s\033[0m\n" "$active"
+
+    # Server
+    printf "Server:       "
+    if _running; then
+        printf "\033[32mrunning\033[0m  (%s)\n" "$API"
+        echo
+        curl -s "$API/v1/models" | python3 -m json.tool 2>/dev/null
+    else
+        printf "\033[31mnot running\033[0m\n"
+    fi
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+}
+
+cmd_chat() {
+    if [ $# -eq 0 ]; then
+        echo "Usage: mlx chat <your prompt>"
+        return 1
+    fi
+    local prompt="$*"
+
+    # Get the local-path model ID from the running server
+    local model_id
+    model_id=$(curl -s "$API/v1/models" | python3 -c "
+import json,sys
+data = json.load(sys.stdin)
+for m in data.get('data',[]):
+    if m['id'].startswith('/'):
+        print(m['id']); break
+else:
+    if data.get('data'):
+        print(data['data'][0]['id'])
+" 2>/dev/null)
+
+    if [ -z "$model_id" ]; then
+        printf "\033[31mError: cannot detect model from server\033[0m\n"
+        printf "\033[33mIs the server running? (mlx status)\033[0m\n"
+        return 1
+    fi
+
+    python3 -c "
+import json, urllib.request, sys
+body = json.dumps({
+    'model': '$model_id',
+    'messages': [{'role': 'user', 'content': sys.argv[1]}],
+    'max_tokens': 1024,
+    'stream': False,
+    'chat_template_kwargs': {'enable_thinking': False}
+}).encode()
+req = urllib.request.Request('$API/v1/chat/completions', data=body,
+    headers={'Content-Type': 'application/json'})
+try:
+    resp = urllib.request.urlopen(req, timeout=120)
+    data = json.loads(resp.read())
+    if 'error' in data:
+        print(f\"\033[31mError: {data['error']['message']}\033[0m\")
+    else:
+        print(data['choices'][0]['message']['content'])
+except Exception as e:
+    print(f\"\033[31mError: {e}\033[0m\")
+    print(f\"\033[33mHint: is the server running? (mlx status)\033[0m\")
+" "$prompt"
+}
+
+cmd_log() {
+    if [ -f "$LOG_FILE" ]; then
+        tail -f "$LOG_FILE"
+    else
+        echo "No log file yet."
+    fi
+}
+
+cmd_restart() {
+    cmd_stop 2>/dev/null || true
+    sleep 1
+    cmd_serve "$@"
+}
+
+# ─── Dispatch ──────────────────────────────────────────────────────
+
+usage() {
+    echo "mlx — MLX model server manager (launchd-backed)"
+    echo
+    echo "Usage:"
+    echo "  mlx serve  <model>     Start a model  (auto-start on boot, auto-restart)"
+    echo "  mlx stop               Stop the server"
+    echo "  mlx restart <model>    Stop & restart"
+    echo "  mlx status             Show server status + active model"
+    echo "  mlx chat   <prompt>    Send a chat query"
+    echo "  mlx log                Tail server log"
+    echo "  mlx models             List registered models"
+    echo "  mlx register <name> <path>  Register a new model"
+    echo
+    cmd_models
+}
+
+case "${1:-}" in
+    serve|s)      shift; cmd_serve "$@" ;;
+    stop|down)    cmd_stop ;;
+    restart|rs)   shift; cmd_restart "$@" ;;
+    status|st)    cmd_status ;;
+    chat|c)       shift; cmd_chat "$@" ;;
+    log|l)        cmd_log ;;
+    models|ls)    cmd_models ;;
+    register|add) shift; cmd_register "$@" ;;
+    *)            usage ;;
+esac
