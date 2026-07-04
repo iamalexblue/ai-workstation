@@ -57,7 +57,7 @@ cmd_models() {
         [[ "$name" =~ ^[[:space:]]*# ]] && continue
         [ -z "$name" ] && continue
         name=$(echo "$name" | xargs)
-        path=$(echo "$path" | xargs)
+        path=$(echo "$path" | sed "s|\$HOME|$HOME|g" | xargs)
         local marker=" "
         [ "$name" = "$active" ] && marker="*"
         if [ -d "$path" ]; then
