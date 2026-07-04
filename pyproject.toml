@@ -10,4 +10,5 @@ dependencies = [
     "sentencepiece>=0.2.1",
     "tokenizers>=0.22.2",
     "transformers>=5.7.0,<5.13.0",
+    "socksio>=1.0.0",
 ]
