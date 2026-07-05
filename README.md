@@ -92,10 +92,11 @@ pst          # Check status
 
 ## Kiss Translator
 
-See `config/kiss-translator-hooks.js` for the ES5-compatible hooks.
+See `config/kiss-translator-hooks.js` for the ES5-compatible hooks.  
+The Request Hook auto-detects the model ID from the server — no hardcoded path needed.
 
 | Setting | Value |
 |---------|-------|
 | API URL | `http://10.10.10.10:8080/v1/chat/completions` |
 | API Key | `local` |
-| Model | `$HOME/AI/models/Qwen3-8B-4bit` |
+| Model | *(any value, auto-overridden by Hook)* |

@@ -92,13 +92,13 @@ pst          # 查看状态
 
 ## Kiss Translator 接入
 
-Hook 代码见 `config/kiss-translator-hooks.js`。
+Hook 代码见 `config/kiss-translator-hooks.js`（自动检测模型 ID，不需要填路径）。
 
 | 设置项 | 值 |
 |--------|-----|
 | API URL | `http://10.10.10.10:8080/v1/chat/completions` |
 | API Key | `local` |
-| Model | `$HOME/AI/models/Qwen3-8B-4bit` |
+| Model | *(任意填，Hook 自动覆盖)* |
 
 ## 新机器部署
 

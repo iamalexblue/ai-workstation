@@ -1,48 +1,40 @@
 // ============================================================
-// Kiss Translator — MLX Local Model Hooks
-// API URL: http://10.10.10.10:8080/v1/chat/completions
-// Model:   __HOME__/AI/models/Qwen3-8B-4bit
-// API Key: local
-// ============================================================
-
-// ============================================================
-// 【旧版】Request Hook — 使用了 ?. 语法，扩展引擎不兼容
-// ============================================================
-// async (args) => {
-//   const userContent = args.userPrompt || JSON.stringify(args.texts?.map((t, i) => `[${i}] ${t}`).join('\n'));
+// Kiss Translator — MLX Local Model Hooks (auto-detect model)
 //
-//   const body = {
-//     model: "__HOME__/AI/models/Qwen3-8B-4bit",
-//     messages: [
-//       { role: "system", content: args.systemPrompt || args.nobatchPrompt || `You are a professional translator. Translate from ${args.from} to ${args.to}. Output ONLY the translation.` },
-//       { role: "user", content: userContent }
-//     ],
-//     max_tokens: 4096,
-//     stream: false,
-//     chat_template_kwargs: { enable_thinking: false }
-//   };
-//   return { url: args.url, body, headers: { "Content-Type": "application/json" }, method: "POST" };
-// };
-
+// 用法:
+//   1. 先启动服务:  mlx serve qwen8b
+//   2. Kiss Translator 设置:
+//      - API URL:    http://10.10.10.10:8080/v1/chat/completions
+//      - API Key:    local
+//      - Model:      任意填 (会被 Hook 自动覆盖)
+//   3. Request Hook 和 Response Hook 填入下方代码
+//
+// 原理: Request Hook 先调 /v1/models 获取服务端实际加载的模型 ID,
+//       再发翻译请求. 无需关心模型路径, 切换模型后自动适配.
 // ============================================================
-// 【旧版】Response Hook — 使用了 ?. 语法，扩展引擎不兼容
-// ============================================================
-// async ({ res, parseAIRes }) => {
-//   const content = res?.choices?.[0]?.message?.content || "";
-//   try {
-//     const parsed = JSON.parse(content);
-//     if (Array.isArray(parsed)) {
-//       return { translations: parsed.map(t => ({ text: typeof t === 'string' ? t : t.text, src: t.src || "" })) };
-//     }
-//   } catch (e) {}
-//   return { translations: [[content]] };
-// };
 
 
 // ============================================================
-// 【新版】Request Hook — 纯 ES5 兼容写法
+// Request Hook (auto-detect model)
 // ============================================================
 async (args) => {
+  // 1. 从服务器自动获取实际模型 ID
+  var modelId = "";
+  try {
+    var mresp = await fetch(args.url.replace(/\/chat\/completions$/, "/models"));
+    var mdata = await mresp.json();
+    if (mdata && mdata.data && mdata.data.length > 0) {
+      // 优先选本地路径 (以 / 开头) 而非 HF ID
+      for (var i = 0; i < mdata.data.length; i++) {
+        var id = mdata.data[i].id;
+        if (id.charAt(0) === "/") { modelId = id; break; }
+      }
+      if (!modelId) modelId = mdata.data[0].id;
+    }
+  } catch (e) {}
+  if (!modelId) modelId = "";  // fallback
+
+  // 2. 构造翻译请求
   var systemPrompt = args.systemPrompt || args.nobatchPrompt || "You are a professional translator. Translate the following text. Output ONLY the translation.";
   var userContent = args.userPrompt || "";
   if (!userContent && args.texts && args.texts.length > 0) {
@@ -50,7 +42,7 @@ async (args) => {
   }
 
   var body = {
-    model: "__HOME__/AI/models/Qwen3-8B-4bit",
+    model: modelId,
     messages: [
       { role: "system", content: systemPrompt },
       { role: "user", content: userContent }
@@ -70,7 +62,7 @@ async (args) => {
 
 
 // ============================================================
-// 【新版】Response Hook — 纯 ES5 兼容写法
+// Response Hook (extract translation)
 // ============================================================
 async (context) => {
   var content = "";
