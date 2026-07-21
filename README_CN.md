@@ -31,6 +31,9 @@ mlx serve qwen8b
 | 名称 | 模型 | 大小 | 内存 | 用途 |
 |------|------|------|------|------|
 | `qwen8b` | Qwen3-8B-4bit (MLX) | 4.3 GB | ~4.5 GB | 翻译 (中/英/日/韩/德/法) |
+| `qwen4b` | Qwen3-4B-Instruct-2507-4bit (MLX) | 3.7 GB | ~2.5 GB | 翻译，速度更快 (默认) |
+
+> `qwen4b` 为默认模型。`mlx serve qwen8b` 切回。
 
 ### 下载模型
 

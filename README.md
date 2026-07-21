@@ -31,6 +31,9 @@ mlx serve qwen8b
 | Name | Model | Size | Memory | Use |
 |------|-------|------|--------|-----|
 | `qwen8b` | Qwen3-8B-4bit (MLX) | 4.3 GB | ~4.5 GB | Translation (CN/EN/JA/KO/DE/FR) |
+| `qwen4b` | Qwen3-4B-Instruct-2507-4bit (MLX) | 3.7 GB | ~2.5 GB | Translation, faster (default) |
+
+> `qwen4b` is the default. Switch with `mlx serve qwen8b`.
 
 ### Download a model
 
